@@ -246,6 +246,48 @@ const deleteBooking = async (req, res) => {
   }
 };
 
+/* get bookings data based on check In Date  */
+// @desc Get bookings by checkInDate
+// @route GET /api/bookings/check-in/:date
+const dayjs = require("dayjs");
+
+const getBookingsByCheckInDate = async (req, res) => {
+  const { date } = req.params;
+
+  try {
+    // Validate date format
+    if (!dayjs(date, "YYYY-MM-DD", true).isValid()) {
+      return res
+        .status(400)
+        .json({ error: "Invalid date format. Use YYYY-MM-DD" });
+    }
+
+    // Set exact date boundaries
+    const searchDate = dayjs(date).startOf("day");
+    const searchDateEnd = searchDate.endOf("day");
+
+    // Find bookings where:
+    // 1. Check-in is before or on search date
+    // 2. Check-out is after search date
+    const bookings = await Booking.find({
+      checkInDate: {
+        $lte: searchDateEnd.toDate(), // Checked in before end of search day
+      },
+      checkOutDate: {
+        $gt: searchDate.toDate(), // Checking out after start of search day
+      },
+    }).sort({
+      checkInDate: 1,
+      createdAt: -1,
+    });
+
+    res.status(200).json(bookings || []);
+  } catch (error) {
+    console.error("Error fetching bookings:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
 module.exports = {
   createBooking,
   updateBooking,
@@ -255,4 +297,5 @@ module.exports = {
   deleteBooking,
   getBookingsByBookingNo,
   updateStatusID,
+  getBookingsByCheckInDate,
 };

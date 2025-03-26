@@ -10,6 +10,11 @@ router.post("/booking", protect, BookingController.createBooking);
 // @desc Get all bookings
 // @route GET /api/bookings
 router.get("/bookings", protect, BookingController.getBookings);
+// @route GET /api/bookings by check in date
+router.get(
+  "/bookings/check-in/:date",
+  BookingController.getBookingsByCheckInDate
+);
 
 // @desc Get a single booking by ID
 // @route GET /api/bookings/:id
