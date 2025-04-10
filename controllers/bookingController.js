@@ -1,4 +1,5 @@
 const Booking = require("../models/Booking");
+const dayjs = require("dayjs");
 
 // Helper function to generate a serial number for today's bookings
 const generateSerialNo = async () => {
@@ -249,7 +250,43 @@ const deleteBooking = async (req, res) => {
 /* get bookings data based on check In Date  */
 // @desc Get bookings by checkInDate
 // @route GET /api/bookings/check-in/:date
-const dayjs = require("dayjs");
+
+// const getBookingsByCheckInDate = async (req, res) => {
+//   const { date } = req.params;
+
+//   try {
+//     // Validate date format
+//     if (!dayjs(date, "YYYY-MM-DD", true).isValid()) {
+//       return res
+//         .status(400)
+//         .json({ error: "Invalid date format. Use YYYY-MM-DD" });
+//     }
+
+//     // Set exact date boundaries
+//     const searchDate = dayjs(date).startOf("day");
+//     const searchDateEnd = searchDate.endOf("day");
+
+//     // Find bookings where:
+//     // 1. Check-in is before or on search date
+//     // 2. Check-out is after search date
+//     const bookings = await Booking.find({
+//       checkInDate: {
+//         $lte: searchDateEnd.toDate(), // Checked in before end of search day
+//       },
+//       checkOutDate: {
+//         $gt: searchDate.toDate(), // Checking out after start of search day
+//       },
+//     }).sort({
+//       checkInDate: 1,
+//       createdAt: -1,
+//     });
+
+//     res.status(200).json(bookings || []);
+//   } catch (error) {
+//     console.error("Error fetching bookings:", error);
+//     res.status(500).json({ error: "Internal server error" });
+//   }
+// };
 
 const getBookingsByCheckInDate = async (req, res) => {
   const { date } = req.params;
@@ -262,29 +299,215 @@ const getBookingsByCheckInDate = async (req, res) => {
         .json({ error: "Invalid date format. Use YYYY-MM-DD" });
     }
 
-    // Set exact date boundaries
+    // Set date boundaries
     const searchDate = dayjs(date).startOf("day");
     const searchDateEnd = searchDate.endOf("day");
 
-    // Find bookings where:
-    // 1. Check-in is before or on search date
-    // 2. Check-out is after search date
-    const bookings = await Booking.find({
-      checkInDate: {
-        $lte: searchDateEnd.toDate(), // Checked in before end of search day
-      },
+    // 1. Get regular invoices (bookings matching the date)
+    const regularInvoice = await Booking.find({
+      checkInDate: { $lte: searchDateEnd.toDate() },
+      checkOutDate: { $gt: searchDate.toDate() },
+    })
+      .sort({ checkInDate: 1 })
+      .lean();
+
+    // 2. Get unpaid invoices with additional filters
+    const unPaidInvoice = await Booking.find({
+      duePayment: { $gt: 0 },
       checkOutDate: {
-        $gt: searchDate.toDate(), // Checking out after start of search day
+        $lt: searchDate.toDate(), // Only show where checkout was BEFORE search date
       },
-    }).sort({
-      checkInDate: 1,
-      createdAt: -1,
+    })
+      .sort({ checkOutDate: -1 }) // Sort by checkout date (recent first)
+      .lean();
+
+    // Format the response
+    const response = {
+      data: {
+        regularInvoice: regularInvoice || [],
+        unPaidInvoice: unPaidInvoice || [],
+      },
+    };
+
+    res.status(200).json(response);
+  } catch (error) {
+    console.error("Error in getBookingsByCheckInDate:", error);
+    res.status(500).json({
+      error: "Internal server error",
+      message:
+        process.env.NODE_ENV === "development" ? error.message : undefined,
+    });
+  }
+};
+
+// @desc Update an existing booking with daily payment tracking
+// @route PUT /api/bookings/:id
+const updateBookingDetails = async (req, res) => {
+  const { id } = req.params;
+  const { totalPaid, dailyAmount, duePayment, searchDate } = req.body;
+
+  try {
+    const booking = await Booking.findById(id).populate("invoice"); // Assuming invoice is populated
+    if (!booking) {
+      return res.status(404).json({ error: "Booking not found" });
+    }
+
+    // Initialize invoiceDetails if it doesn't exist
+    if (!booking.invoiceDetails) {
+      booking.invoiceDetails = [];
+    }
+
+    // Convert searchDate to proper Date object
+    const searchDateObj = new Date(searchDate);
+    const searchDateStart = dayjs(searchDateObj).startOf("day").toDate();
+    const searchDateEnd = dayjs(searchDateObj).endOf("day").toDate();
+
+    // Find existing entry for the search date
+    const existingEntryIndex = booking.invoiceDetails.findIndex((entry) => {
+      const entryDate = new Date(entry.date);
+      return entryDate >= searchDateStart && entryDate <= searchDateEnd;
     });
 
-    res.status(200).json(bookings || []);
+    if (existingEntryIndex >= 0) {
+      // Update existing entry
+      booking.invoiceDetails[existingEntryIndex] = {
+        date: searchDateObj,
+        totalPaid: totalPaid || 0,
+        dailyAmount: dailyAmount || 0,
+      };
+    } else {
+      // Add new entry
+      booking.invoiceDetails.push({
+        date: searchDateObj,
+        totalPaid: totalPaid || 0,
+        dailyAmount: dailyAmount || 0,
+      });
+    }
+
+    // Calculate total paid so far
+    const sumTotalPaid = booking.invoiceDetails.reduce(
+      (sum, entry) => sum + (entry.totalPaid || 0),
+      0
+    );
+
+    // Update main booking fields
+    booking.totalPaid = sumTotalPaid;
+    booking.dailyAmount = dailyAmount || 0;
+    booking.dueAmount = booking.totalBill - sumTotalPaid;
+
+    // Save updated booking
+    const updatedBooking = await booking.save();
+
+    // Update the linked invoice (if available)
+    if (booking.invoice) {
+      booking.invoice.totalPaid = sumTotalPaid;
+      booking.invoice.dueAmount = booking.totalBill - sumTotalPaid;
+      booking.invoice.dailyAmount = dailyAmount || 0;
+
+      await booking.invoice.save();
+    }
+
+    res.status(200).json({
+      message: "Booking and invoice updated successfully",
+      booking: updatedBooking,
+      invoice: booking.invoice || null,
+    });
   } catch (error) {
-    console.error("Error fetching bookings:", error);
-    res.status(500).json({ error: "Internal server error" });
+    console.error("Error updating booking:", error);
+    res.status(400).json({
+      error: "Failed to update booking",
+      details: error.message,
+    });
+  }
+};
+
+// @desc Get daily summary for a specific date
+// @route GET /api/daily-summary/:date
+const getDailySummary = async (req, res) => {
+  const { date } = req.params;
+
+  try {
+    // Validate date format
+    if (!dayjs(date, "YYYY-MM-DD", true).isValid()) {
+      return res
+        .status(400)
+        .json({ error: "Invalid date format. Use YYYY-MM-DD" });
+    }
+
+    // 1. Get previous day's closing balance
+    const prevDate = dayjs(date).subtract(1, "day").format("YYYY-MM-DD");
+    const prevDaySummary = await Booking.aggregate([
+      {
+        $match: {
+          $or: [
+            { checkInDate: { $lte: new Date(prevDate) } },
+            { checkOutDate: { $gte: new Date(prevDate) } },
+          ],
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          totalIncome: { $sum: "$dailyAmount" },
+          totalExpenses: { $sum: 0 }, // Currently 0 as per requirements
+          closingBalance: {
+            $sum: {
+              $subtract: [
+                { $sum: "$dailyAmount" },
+                0, // Expenses currently 0
+              ],
+            },
+          },
+        },
+      },
+    ]);
+
+    const openingBalance =
+      prevDaySummary.length > 0 ? prevDaySummary[0].closingBalance : 0;
+
+    // 2. Get today's daily income (sum of all dailyAmounts for the date)
+    const currentDateStart = dayjs(date).startOf("day").toDate();
+    const currentDateEnd = dayjs(date).endOf("day").toDate();
+
+    const todayBookings = await Booking.find({
+      $or: [
+        { checkInDate: { $lte: currentDateEnd } },
+        { checkOutDate: { $gte: currentDateStart } },
+      ],
+    });
+
+    const dailyIncome = todayBookings.reduce((sum, booking) => {
+      const todaysPayment = booking.invoiceDetails?.find((entry) => {
+        const entryDate = new Date(entry.date);
+        return entryDate >= currentDateStart && entryDate <= currentDateEnd;
+      });
+      return sum + (todaysPayment?.dailyAmount || 0);
+    }, 0);
+
+    // 3. Calculate other values
+    const totalBalance = openingBalance + dailyIncome;
+    const dailyExpenses = 0; // Temporary as per requirements
+    const closingBalance = totalBalance - dailyExpenses;
+
+    // Prepare response
+    const response = {
+      date,
+      openingBalance,
+      dailyIncome,
+      totalBalance,
+      dailyExpenses,
+      closingBalance,
+      bookingsCount: todayBookings.length,
+    };
+
+    res.status(200).json(response);
+  } catch (error) {
+    console.error("Error in getDailySummary:", error);
+    res.status(500).json({
+      error: "Internal server error",
+      message:
+        process.env.NODE_ENV === "development" ? error.message : undefined,
+    });
   }
 };
 
@@ -298,4 +521,6 @@ module.exports = {
   getBookingsByBookingNo,
   updateStatusID,
   getBookingsByCheckInDate,
+  updateBookingDetails,
+  getDailySummary, // Add this line
 };

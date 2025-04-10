@@ -37,6 +37,12 @@ router.post(
 // @desc Update an existing booking
 // @route PUT /api/bookings/:id
 router.put("/booking/:id", protect, BookingController.updateBooking);
+router.put(
+  "/booking/details/:id",
+  protect,
+  BookingController.updateBookingDetails
+);
+router.get("/daily-summary/:date", BookingController.getDailySummary);
 // @route PUT /api/bookings/:id
 router.put("/booking/soft/:id", protect, BookingController.updateStatusID);
 
