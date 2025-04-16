@@ -6,6 +6,7 @@ const hotelCategoryRoutes = require("./routes/hotelCategoryRoutes"); // Import s
 const roomRoutes = require("./routes/roomRoutes"); // Import slider routes
 const hotelRoutes = require("./routes/hotelRoutes"); // Import hotel routes
 const bookingRoutes = require("./routes/bookingRoutes"); // Import booking routes
+const dailySummaryRoutes = require("./routes/dailySummary"); // Import booking routes
 require("dotenv").config();
 
 const app = express();
@@ -32,6 +33,8 @@ app.use("/api", hotelRoutes); // Add slider routes under /api
 
 //Booking Routes
 app.use("/api", bookingRoutes);
+//Booking Routes
+app.use("/api", dailySummaryRoutes);
 
 // Root Route
 app.get("/", (req, res) => {

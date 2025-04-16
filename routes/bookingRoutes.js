@@ -42,7 +42,7 @@ router.put(
   protect,
   BookingController.updateBookingDetails
 );
-router.get("/daily-summary/:date", BookingController.getDailySummary);
+// router.get("/daily-summary/:date", BookingController.getDailySummary);
 // @route PUT /api/bookings/:id
 router.put("/booking/soft/:id", protect, BookingController.updateStatusID);
 

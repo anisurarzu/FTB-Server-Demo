@@ -346,6 +346,8 @@ const updateBookingDetails = async (req, res) => {
   const { id } = req.params;
   const { totalPaid, dailyAmount, duePayment, searchDate } = req.body;
 
+  console.log("dailyAmount", dailyAmount);
+
   try {
     const booking = await Booking.findById(id).populate("invoice"); // Assuming invoice is populated
     if (!booking) {
