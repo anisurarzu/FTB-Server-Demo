@@ -32,11 +32,11 @@ const BookingSchema = new mongoose.Schema(
       {
         method: { type: String, required: true },
         amount: { type: Number, required: true },
-        transactionId: { type: String, required: true },
+        transactionId: { type: String, required: false },
         date: { type: Date, default: Date.now },
       },
     ],
-    transactionId: { type: String, required: true },
+    transactionId: { type: String, required: false },
     note: { type: String },
 
     isKitchen: { type: Boolean },
