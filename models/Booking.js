@@ -28,7 +28,14 @@ const BookingSchema = new mongoose.Schema(
     totalPaid: { type: Number, default: 0 },
     dailyAmount: { type: Number, default: 0 },
 
-    paymentMethod: { type: String },
+    payments: [
+      {
+        method: { type: String, required: true },
+        amount: { type: Number, required: true },
+        transactionId: { type: String, required: true },
+        date: { type: Date, default: Date.now },
+      },
+    ],
     transactionId: { type: String, required: true },
     note: { type: String },
 

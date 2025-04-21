@@ -59,28 +59,34 @@ const createBooking = async (req, res) => {
   const bookingData = req.body;
 
   try {
+    // Calculate total paid amount from payments array
+    const totalPaid = bookingData.payments.reduce(
+      (sum, payment) => sum + (payment.amount || 0),
+      0
+    );
+
+    // Update booking data with calculated fields
+    bookingData.totalPaid = totalPaid;
+    bookingData.advancePayment = totalPaid;
+    bookingData.duePayment = bookingData.totalBill - totalPaid;
+
     let bookingNo;
     const serialNo = await generateSerialNo();
 
-    // Check if the reference exists (i.e., the booking is associated with an existing bookingNo)
     if (bookingData.reference) {
       const referenceBooking = await Booking.findOne({
         bookingNo: bookingData.reference,
       });
 
       if (referenceBooking) {
-        // Use the existing bookingNo from the reference
         bookingNo = referenceBooking.bookingNo;
       } else {
-        // If the reference bookingNo does not exist, generate a new booking number
         bookingNo = await generateBookingNo();
       }
     } else {
-      // Generate a new booking number if no reference is provided
       bookingNo = await generateBookingNo();
     }
 
-    // Create the new booking with either the referenced or new bookingNo
     const booking = await Booking.create({
       ...bookingData,
       bookingNo,
@@ -100,9 +106,21 @@ const updateBooking = async (req, res) => {
   const bookingData = req.body;
 
   try {
+    // Calculate total paid amount from payments array
+    const totalPaid = bookingData.payments.reduce(
+      (sum, payment) => sum + (payment.amount || 0),
+      0
+    );
+
+    // Update booking data with calculated fields
+    bookingData.totalPaid = totalPaid;
+    bookingData.advancePayment = totalPaid;
+    bookingData.duePayment = bookingData.totalBill - totalPaid;
+
     const booking = await Booking.findByIdAndUpdate(id, bookingData, {
       new: true,
     });
+
     if (!booking) {
       return res.status(404).json({ error: "Booking not found" });
     }
@@ -392,10 +410,14 @@ const updateBookingDetails = async (req, res) => {
       0
     );
 
+    // Calculate the due amount
+    const calculatedDueAmount = booking.totalBill - sumTotalPaid;
+
     // Update main booking fields
     booking.totalPaid = sumTotalPaid;
     booking.dailyAmount = dailyAmount || 0;
-    booking.dueAmount = booking.totalBill - sumTotalPaid;
+    booking.dueAmount = calculatedDueAmount;
+    booking.duePayment = calculatedDueAmount; // Make sure to update duePayment as well
 
     // Save updated booking
     const updatedBooking = await booking.save();
@@ -403,7 +425,8 @@ const updateBookingDetails = async (req, res) => {
     // Update the linked invoice (if available)
     if (booking.invoice) {
       booking.invoice.totalPaid = sumTotalPaid;
-      booking.invoice.dueAmount = booking.totalBill - sumTotalPaid;
+      booking.invoice.dueAmount = calculatedDueAmount;
+      booking.invoice.duePayment = calculatedDueAmount; // Update duePayment in invoice too
       booking.invoice.dailyAmount = dailyAmount || 0;
 
       await booking.invoice.save();
