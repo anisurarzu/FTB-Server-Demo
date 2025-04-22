@@ -38,7 +38,6 @@ const BookingSchema = new mongoose.Schema(
     ],
     transactionId: { type: String, required: false },
     note: { type: String },
-
     isKitchen: { type: Boolean },
     kitchenTotalBill: { type: Number },
     extraBed: { type: Boolean },
