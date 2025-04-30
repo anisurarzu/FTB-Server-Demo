@@ -364,10 +364,8 @@ const updateBookingDetails = async (req, res) => {
   const { id } = req.params;
   const { totalPaid, dailyAmount, duePayment, searchDate } = req.body;
 
-  console.log("dailyAmount", dailyAmount);
-
   try {
-    const booking = await Booking.findById(id).populate("invoice"); // Assuming invoice is populated
+    const booking = await Booking.findById(id).populate("invoice");
     if (!booking) {
       return res.status(404).json({ error: "Booking not found" });
     }
@@ -389,45 +387,36 @@ const updateBookingDetails = async (req, res) => {
     });
 
     if (existingEntryIndex >= 0) {
-      // Update existing entry
+      // Update existing entry with exact values from request
       booking.invoiceDetails[existingEntryIndex] = {
         date: searchDateObj,
-        totalPaid: totalPaid || 0,
-        dailyAmount: dailyAmount || 0,
+        totalPaid: totalPaid,
+        dailyAmount: dailyAmount,
       };
     } else {
-      // Add new entry
+      // Add new entry with exact values from request
       booking.invoiceDetails.push({
         date: searchDateObj,
-        totalPaid: totalPaid || 0,
-        dailyAmount: dailyAmount || 0,
+        totalPaid: totalPaid,
+        dailyAmount: dailyAmount,
       });
     }
 
-    // Calculate total paid so far
-    const sumTotalPaid = booking.invoiceDetails.reduce(
-      (sum, entry) => sum + (entry.totalPaid || 0),
-      0
-    );
-
-    // Calculate the due amount
-    const calculatedDueAmount = booking.totalBill - sumTotalPaid;
-
-    // Update main booking fields
-    booking.totalPaid = sumTotalPaid;
-    booking.dailyAmount = dailyAmount || 0;
-    booking.dueAmount = calculatedDueAmount;
-    booking.duePayment = calculatedDueAmount; // Make sure to update duePayment as well
+    // Update main booking fields with exact values from request (no calculations)
+    booking.totalPaid = totalPaid;
+    booking.dailyAmount = dailyAmount;
+    booking.dueAmount = duePayment;
+    booking.duePayment = duePayment;
 
     // Save updated booking
     const updatedBooking = await booking.save();
 
-    // Update the linked invoice (if available)
+    // Update the linked invoice with exact values (if available)
     if (booking.invoice) {
-      booking.invoice.totalPaid = sumTotalPaid;
-      booking.invoice.dueAmount = calculatedDueAmount;
-      booking.invoice.duePayment = calculatedDueAmount; // Update duePayment in invoice too
-      booking.invoice.dailyAmount = dailyAmount || 0;
+      booking.invoice.totalPaid = totalPaid;
+      booking.invoice.dueAmount = duePayment;
+      booking.invoice.duePayment = duePayment;
+      booking.invoice.dailyAmount = dailyAmount;
 
       await booking.invoice.save();
     }
