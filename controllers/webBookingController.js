@@ -52,7 +52,7 @@ const generateBookingNo = async () => {
   return newBookingNo;
 };
 
-// @desc Create a new booking
+// @desc Create a new booking with default 'pending' status
 // @route POST /api/bookings
 const createBooking = async (req, res) => {
   const bookingData = req.body;
@@ -79,14 +79,62 @@ const createBooking = async (req, res) => {
       bookingNo = await generateBookingNo();
     }
 
-    // Create the new booking with either the referenced or new bookingNo
+    // Create the new booking with default status
     const booking = await UserBooking.create({
       ...bookingData,
       bookingNo,
       serialNo,
+      status: "pending", // Default status
+      statusID: 1, // Assuming 1 = pending
     });
 
     res.status(200).json({ message: "Booking created successfully", booking });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+};
+
+// @desc Update booking status with special handling for cancellations
+// @route PUT /api/bookings/status/:id
+const updateBookingStatus = async (req, res) => {
+  const { id } = req.params;
+  const { status, canceledBy, reason } = req.body;
+
+  try {
+    const updateData = { status };
+
+    // Handle different status updates
+    switch (status.toLowerCase()) {
+      case "cancel":
+        updateData.statusID = 255;
+        updateData.canceledBy = canceledBy;
+        updateData.reason = reason;
+        break;
+      case "confirmed":
+        updateData.statusID = 2; // Assuming 2 = confirmed
+        break;
+      case "pending":
+        updateData.statusID = 1; // Assuming 1 = pending
+        break;
+      // Add more status cases as needed
+      default:
+        // If status isn't recognized, keep the existing statusID
+        break;
+    }
+
+    const booking = await UserBooking.findByIdAndUpdate(id, updateData, {
+      new: true,
+      runValidators: true,
+    });
+
+    if (!booking) {
+      return res.status(404).json({ error: "Booking not found" });
+    }
+
+    res.status(200).json({
+      message: "Booking status updated successfully",
+      booking,
+    });
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
@@ -115,39 +163,27 @@ const updateBooking = async (req, res) => {
 // @route GET /api/bookings
 const getBookings = async (req, res) => {
   try {
-    // const bookings = await Booking.find({ statusID: { $ne: 255 } }).sort({
-    //   createdAt: -1,
-    // });
-    // Fetch and sort bookings
     const bookings = await UserBooking.find().sort({ createdAt: -1 });
-
-    // Respond with bookings array
     res.status(200).json(bookings);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
-// @desc Get bookings by hotelID
-// @route GET /api/bookings/hotel/:hotelID
-// @desc Get bookings by hotelID (string version)
-// @route GET /api/bookings/hotel/:hotelID
+
 // @desc Get bookings by hotelID
 // @route GET /api/bookings/hotel/:hotelID
 const getBookingsByHotelId = async (req, res) => {
-  const { hotelID } = req.body; // Extract hotelID from the body instead of params
+  const { hotelID } = req.body;
 
   try {
-    // Convert hotelID from string to number, since hotelID is a number in your schema
     const numericHotelID = Number(hotelID);
 
-    // Check if the conversion was successful (not NaN)
     if (isNaN(numericHotelID)) {
       return res
         .status(400)
         .json({ error: "Invalid hotelID. Must be a number." });
     }
 
-    // Find all bookings associated with the given hotelID and sort by creation date (latest first)
     const bookings = await UserBooking.find({ hotelID: numericHotelID }).sort({
       createdAt: -1,
     });
@@ -169,7 +205,6 @@ const getBookingsByBookingNo = async (req, res) => {
   const { bookingNo } = req.params;
 
   try {
-    // Find all bookings that have the same bookingNo
     const bookings = await UserBooking.find({ bookingNo: bookingNo });
 
     if (bookings.length === 0) {
@@ -200,20 +235,18 @@ const getBookingById = async (req, res) => {
   }
 };
 
-/* -------------- soft delete----- */
-
+// @desc Soft delete booking (legacy method)
 const updateStatusID = async (req, res) => {
   const { id } = req.params;
-  const { canceledBy, reason } = req.body; // Get both canceledBy and reason from the request body
+  const { canceledBy, reason } = req.body;
 
   try {
-    // Use runValidators to enforce schema validation on updates
     const booking = await UserBooking.findByIdAndUpdate(
       id,
       {
         statusID: 255,
-        canceledBy, // Update the canceledBy field
-        reason, // Update the reason field as well
+        canceledBy,
+        reason,
       },
       { new: true, runValidators: true }
     );
@@ -224,7 +257,7 @@ const updateStatusID = async (req, res) => {
 
     res.status(200).json({
       message: "Booking status updated to 255, canceledBy and reason updated.",
-      updatedBooking: booking, // Optionally include the updated booking object for debugging
+      updatedBooking: booking,
     });
   } catch (error) {
     res.status(500).json({ error: "Server error", details: error.message });
@@ -269,15 +302,15 @@ const deleteBooking = async (req, res) => {
   }
 };
 
-// Add this to your exports at the bottom of the file
 module.exports = {
   createBooking,
   updateBooking,
+  updateBookingStatus,
   getBookings,
   getBookingsByHotelId,
   getBookingById,
   deleteBooking,
   getBookingsByBookingNo,
   updateStatusID,
-  getBookingsByUserId, // Add this line
+  getBookingsByUserId,
 };

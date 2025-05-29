@@ -9,6 +9,8 @@ const bookingRoutes = require("./routes/bookingRoutes"); // Import booking route
 const webBookingRoutes = require("./routes/webBookingRoutes"); // Import webBookingRoutes routes
 const dailySummaryRoutes = require("./routes/dailySummary"); // Import booking routes
 const expenseRoutes = require("./routes/expenses");
+const webHotelRoutes = require("./routes/webHotelRoutes");
+const webHotelDetailsRoutes = require("./routes/webHotelDetailsRoutes");
 require("dotenv").config();
 
 const app = express();
@@ -41,6 +43,9 @@ app.use("/api", dailySummaryRoutes);
 app.use("/api", webBookingRoutes);
 //Expense Routes
 app.use("/api/expenses", expenseRoutes);
+
+app.use("/api/web-hotels", webHotelRoutes);
+app.use("/api/web-hotel-details", webHotelDetailsRoutes);
 
 // Root Route
 app.get("/", (req, res) => {
