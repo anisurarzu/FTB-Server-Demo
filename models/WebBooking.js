@@ -32,7 +32,9 @@ const BookingSchema = new mongoose.Schema(
       trim: true,
     },
     hotelID: {
-      type: Number,
+      type: String,
+      required: [true, "Hotel name is required"],
+      trim: true,
     },
     roomCategoryID: {
       type: String,

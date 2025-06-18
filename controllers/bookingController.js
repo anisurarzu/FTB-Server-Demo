@@ -310,36 +310,30 @@ const getBookingsByCheckInDate = async (req, res) => {
   const { date } = req.params;
 
   try {
-    // Validate date format
     if (!dayjs(date, "YYYY-MM-DD", true).isValid()) {
       return res
         .status(400)
         .json({ error: "Invalid date format. Use YYYY-MM-DD" });
     }
 
-    // Set date boundaries
     const searchDate = dayjs(date).startOf("day");
-    const searchDateEnd = searchDate.endOf("day");
 
-    // 1. Get regular invoices (bookings matching the date)
+    // ✅ Get bookings where guest is staying on this date
     const regularInvoice = await Booking.find({
-      checkInDate: { $lte: searchDateEnd.toDate() },
+      checkInDate: { $lte: searchDate.toDate() },
       checkOutDate: { $gt: searchDate.toDate() },
     })
       .sort({ checkInDate: 1 })
       .lean();
 
-    // 2. Get unpaid invoices with additional filters
+    // ✅ Get unpaid invoices where check-out was before this day
     const unPaidInvoice = await Booking.find({
       duePayment: { $gt: 0 },
-      checkOutDate: {
-        $lt: searchDate.toDate(), // Only show where checkout was BEFORE search date
-      },
+      checkOutDate: { $lt: searchDate.toDate() },
     })
-      .sort({ checkOutDate: -1 }) // Sort by checkout date (recent first)
+      .sort({ checkOutDate: -1 })
       .lean();
 
-    // Format the response
     const response = {
       data: {
         regularInvoice: regularInvoice || [],
