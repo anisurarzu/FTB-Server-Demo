@@ -317,8 +317,9 @@ const getBookingsByCheckInDate = async (req, res) => {
     }
 
     const searchDate = dayjs(date).startOf("day");
+    const nextDate = dayjs(date).endOf("day");
 
-    // ✅ Get bookings where guest is staying on this date
+    // ✅ Keep this logic as it was – guest staying on that date
     const regularInvoice = await Booking.find({
       checkInDate: { $lte: searchDate.toDate() },
       checkOutDate: { $gt: searchDate.toDate() },
@@ -326,14 +327,28 @@ const getBookingsByCheckInDate = async (req, res) => {
       .sort({ checkInDate: 1 })
       .lean();
 
-    // ✅ Get unpaid invoices where check-out was before this day
-    const unPaidInvoice = await Booking.find({
-      duePayment: { $gt: 0 },
+    // ✅ Fetch all bookings with past checkout and invoice entries
+    const potentialUnpaid = await Booking.find({
       checkOutDate: { $lt: searchDate.toDate() },
-    })
-      .sort({ checkOutDate: -1 })
-      .lean();
+      invoiceDetails: { $exists: true, $not: { $size: 0 } },
+    }).lean();
 
+    // ✅ Filter only those where:
+    //   - duePayment > 0 (still unpaid)
+    //   - OR last invoice date === searchDate (was cleared today)
+    const unPaidInvoice = potentialUnpaid.filter((booking) => {
+      const lastInvoice =
+        booking.invoiceDetails[booking.invoiceDetails.length - 1];
+
+      const lastPaymentDate = lastInvoice?.date;
+      const isSameDay = lastPaymentDate
+        ? dayjs(lastPaymentDate).isSame(searchDate, "day")
+        : false;
+
+      return booking.duePayment > 0 || isSameDay;
+    });
+
+    // ✅ Respond with separate lists
     const response = {
       data: {
         regularInvoice: regularInvoice || [],
