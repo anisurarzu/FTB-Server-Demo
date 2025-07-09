@@ -1,3 +1,4 @@
+// controllers/webHotelDetails.js
 const WebHotelDetails = require("../models/WebHotelDetails");
 
 // @desc Get all web hotel details
@@ -20,15 +21,12 @@ const getAllWebHotelDetails = async (req, res) => {
 // @route GET /api/web-hotel-details/:id
 const getWebHotelDetailsById = async (req, res) => {
   try {
-    // Find by hotelId instead of _id
     const webHotelDetails = await WebHotelDetails.findOne({
       hotelId: req.params.id,
     });
-
     if (!webHotelDetails) {
       return res.status(404).json({ error: "Web hotel details not found" });
     }
-
     res.status(200).json(webHotelDetails);
   } catch (error) {
     res.status(500).json({
@@ -37,20 +35,19 @@ const getWebHotelDetailsById = async (req, res) => {
     });
   }
 };
+
 // @desc Create new web hotel details
 // @route POST /api/web-hotel-details
 const createWebHotelDetails = async (req, res) => {
   try {
-    const { hotelId, name, location, rating, roomTypes } = req.body;
+    const { hotelId, name, categories } = req.body;
 
-    // Validate required fields
-    if (!hotelId || !name || !location) {
+    if (!hotelId || !name) {
       return res.status(400).json({
-        error: "Hotel ID, name, and location are required",
+        error: "Hotel ID and name are required",
       });
     }
 
-    // Check for duplicate hotelId
     const existing = await WebHotelDetails.findOne({ hotelId });
     if (existing) {
       return res.status(409).json({
@@ -58,12 +55,11 @@ const createWebHotelDetails = async (req, res) => {
       });
     }
 
-    // Process room types data
-    const processedRoomTypes = processRoomTypes(roomTypes);
+    const processedCategories = processCategories(categories);
 
     const webHotelDetails = await WebHotelDetails.create({
       ...req.body,
-      roomTypes: processedRoomTypes,
+      categories: processedCategories,
     });
 
     res.status(201).json(webHotelDetails);
@@ -79,12 +75,12 @@ const createWebHotelDetails = async (req, res) => {
 // @route PUT /api/web-hotel-details/:id
 const updateWebHotelDetails = async (req, res) => {
   try {
-    const { roomTypes } = req.body;
+    const { categories } = req.body;
 
-    // Process room types data if provided
-    const updateData = roomTypes
-      ? { ...req.body, roomTypes: processRoomTypes(roomTypes) }
-      : req.body;
+    const updateData = {
+      ...req.body,
+      ...(categories && { categories: processCategories(categories) }),
+    };
 
     const webHotelDetails = await WebHotelDetails.findByIdAndUpdate(
       req.params.id,
@@ -127,30 +123,33 @@ const deleteWebHotelDetails = async (req, res) => {
   }
 };
 
-// Helper function to process room types data
-const processRoomTypes = (roomTypes = []) => {
-  return roomTypes.map((room) => ({
-    name: room.name?.trim(),
-    description: room.description?.trim(),
-    amenities: Array.isArray(room.amenities)
-      ? room.amenities.map((a) => a?.trim()).filter(Boolean)
+// Helper to process categories
+const processCategories = (categories = []) => {
+  return categories.map((category) => ({
+    categoryName: category.categoryName?.trim(),
+    categoryDetails: category.categoryDetails?.trim(),
+    adultCount: Number(category.adultCount) || 0,
+    childCount: Number(category.childCount) || 0,
+    amenities: Array.isArray(category.amenities)
+      ? category.amenities.map((a) => a?.trim()).filter(Boolean)
       : [],
-    roomImages: Array.isArray(room.roomImages)
-      ? room.roomImages.slice(0, 3) // Enforce max 3 images
+    images: Array.isArray(category.images)
+      ? category.images.map((img) => ({
+          url: img.url,
+          name: img.name || "category_image",
+          size: img.size || 0,
+          type: img.type || "image/jpeg",
+        }))
       : [],
-    options: Array.isArray(room.options)
-      ? room.options.map((option) => ({
-          type: option.type?.trim(),
-          adults: Number(option.adults) || 1,
-          price: Number(option.price) || 0,
-          originalPrice: Number(option.originalPrice) || 0,
+    priceRanges: Array.isArray(category.priceRanges)
+      ? category.priceRanges.map((range) => ({
+          dates: range.dates?.slice(0, 2).map((d) => new Date(d)),
+          price: Number(range.price) || 0,
           discountPercent: Math.min(
-            Math.max(Number(option.discountPercent) || 0, 0),
+            Math.max(Number(range.discountPercent) || 0, 0),
             100
           ),
-          taxes: Number(option.taxes) || 0,
-          breakfast: Boolean(option.breakfast),
-          cancellation: option.cancellation?.trim(),
+          taxes: Number(range.taxes) || 0,
         }))
       : [],
   }));

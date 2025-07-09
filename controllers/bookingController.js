@@ -317,9 +317,8 @@ const getBookingsByCheckInDate = async (req, res) => {
     }
 
     const searchDate = dayjs(date).startOf("day");
-    const nextDate = dayjs(date).endOf("day");
 
-    // ✅ Keep this logic as it was – guest staying on that date
+    // ✅ Guests staying on this day
     const regularInvoice = await Booking.find({
       checkInDate: { $lte: searchDate.toDate() },
       checkOutDate: { $gt: searchDate.toDate() },
@@ -327,36 +326,29 @@ const getBookingsByCheckInDate = async (req, res) => {
       .sort({ checkInDate: 1 })
       .lean();
 
-    // ✅ Fetch all bookings with past checkout and invoice entries
+    // ✅ Get all bookings where check-out is today or earlier
     const potentialUnpaid = await Booking.find({
-      checkOutDate: { $lt: searchDate.toDate() },
+      checkOutDate: { $lte: searchDate.toDate() }, // ← Fixed here
       invoiceDetails: { $exists: true, $not: { $size: 0 } },
     }).lean();
 
-    // ✅ Filter only those where:
-    //   - duePayment > 0 (still unpaid)
-    //   - OR last invoice date === searchDate (was cleared today)
     const unPaidInvoice = potentialUnpaid.filter((booking) => {
       const lastInvoice =
         booking.invoiceDetails[booking.invoiceDetails.length - 1];
-
       const lastPaymentDate = lastInvoice?.date;
       const isSameDay = lastPaymentDate
         ? dayjs(lastPaymentDate).isSame(searchDate, "day")
         : false;
 
-      return booking.duePayment > 0 || isSameDay;
+      return booking.duePayment > 0 || (booking.duePayment === 0 && isSameDay);
     });
 
-    // ✅ Respond with separate lists
-    const response = {
+    res.status(200).json({
       data: {
         regularInvoice: regularInvoice || [],
         unPaidInvoice: unPaidInvoice || [],
       },
-    };
-
-    res.status(200).json(response);
+    });
   } catch (error) {
     console.error("Error in getBookingsByCheckInDate:", error);
     res.status(500).json({
@@ -366,7 +358,6 @@ const getBookingsByCheckInDate = async (req, res) => {
     });
   }
 };
-
 // @desc Update an existing booking with daily payment tracking
 // @route PUT /api/bookings/:id
 const updateBookingDetails = async (req, res) => {

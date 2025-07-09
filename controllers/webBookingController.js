@@ -1,4 +1,5 @@
 const UserBooking = require("../models/WebBooking");
+const mongoose = require("mongoose");
 
 // Helper function to generate a serial number for today's bookings
 const generateSerialNo = async () => {
@@ -266,6 +267,7 @@ const updateStatusID = async (req, res) => {
 
 // @desc Get all bookings by userID
 // @route GET /api/bookings/user/:userID
+const WebHotel = require("../models/WebHotel");
 const getBookingsByUserId = async (req, res) => {
   const { userID } = req.params;
 
@@ -280,7 +282,22 @@ const getBookingsByUserId = async (req, res) => {
         .json({ error: "No bookings found for this user ID" });
     }
 
-    res.status(200).json(bookings);
+    // Enrich bookings with hotel image (from WebHotel model)
+    const enrichedBookings = await Promise.all(
+      bookings.map(async (booking) => {
+        const hotel = await WebHotel.findOne(
+          { _id: booking.hotelID },
+          { image: 1 }
+        );
+
+        return {
+          ...booking.toObject(),
+          hotelImage: hotel ? hotel.image : null,
+        };
+      })
+    );
+
+    res.status(200).json(enrichedBookings);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -302,6 +319,109 @@ const deleteBooking = async (req, res) => {
   }
 };
 
+// In your BookingController.js
+const cancelBooking = async (req, res) => {
+  const { id } = req.params;
+  const { reason } = req.body;
+
+  console.log(`Cancellation request for booking ID: ${id}`); // Debug log
+
+  // Validate booking ID
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    console.log("Invalid booking ID format:", id); // Debug log
+    return res.status(400).json({
+      success: false,
+      error: "Invalid booking ID format",
+    });
+  }
+
+  try {
+    // Debug: Log before find operation
+    console.log("Attempting to find booking:", id);
+
+    // Find the booking first to ensure it exists
+    const booking = await UserBooking.findById(id).lean();
+
+    if (!booking) {
+      console.log("Booking not found:", id); // Debug log
+      return res.status(404).json({
+        success: false,
+        error: "Booking not found",
+      });
+    }
+
+    // Debug: Log current booking status
+    console.log("Current booking status:", {
+      status: booking.status,
+      statusID: booking.statusID,
+    });
+
+    // Check if booking is already cancelled
+    if (booking.statusID === 255) {
+      console.log("Booking already cancelled:", id); // Debug log
+      return res.status(400).json({
+        success: false,
+        error: "Booking is already cancelled",
+        booking, // Return current state for reference
+      });
+    }
+
+    // Prepare update data
+    const updateData = {
+      status: "cancelled",
+      statusID: 255,
+      cancelledAt: new Date(),
+      reason: reason || "Cancelled by user",
+      canceledBy: req.user?._id || "system",
+      updatedAt: new Date(), // Explicitly update this field
+    };
+
+    console.log("Update data:", updateData); // Debug log
+
+    // Update booking status
+    const updatedBooking = await UserBooking.findByIdAndUpdate(id, updateData, {
+      new: true,
+      runValidators: true,
+      session: await mongoose.startSession(), // Use transaction for safety
+    }).session(options.session);
+
+    console.log("Updated booking:", updatedBooking); // Debug log
+
+    if (!updatedBooking) {
+      console.error("Update operation failed but no error thrown");
+      return res.status(500).json({
+        success: false,
+        error: "Update operation failed unexpectedly",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Booking cancelled successfully",
+      booking: updatedBooking,
+    });
+  } catch (error) {
+    console.error("[CANCELLATION ERROR DETAILS]", {
+      message: error.message,
+      stack: error.stack,
+      error: error,
+    });
+
+    res.status(500).json({
+      success: false,
+      error: "Failed to cancel booking",
+      systemError:
+        process.env.NODE_ENV === "development"
+          ? {
+              message: error.message,
+              stack: error.stack,
+            }
+          : undefined,
+      suggestion: "Check server logs for detailed error information",
+    });
+  }
+};
+
 module.exports = {
   createBooking,
   updateBooking,
@@ -313,4 +433,5 @@ module.exports = {
   getBookingsByBookingNo,
   updateStatusID,
   getBookingsByUserId,
+  cancelBooking,
 };

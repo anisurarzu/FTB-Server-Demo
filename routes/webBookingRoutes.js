@@ -58,5 +58,10 @@ router.put("/web/booking/soft/:id", protect, BookingController.updateStatusID);
 // @desc Delete a booking
 // @route DELETE /api/web/booking/:id
 router.delete("/web/booking/:id", protect, BookingController.deleteBooking);
+router.patch(
+  "/web/booking/:id/cancel",
+  protect,
+  BookingController.cancelBooking
+);
 
 module.exports = router;

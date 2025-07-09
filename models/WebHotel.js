@@ -9,7 +9,7 @@ const webHotelSchema = new mongoose.Schema(
     price: { type: Number, required: true },
     discount: { type: String },
     rating: { type: Number, min: 0, max: 5 },
-    image: { type: String },
+    image: [{ type: String }], // Changed to array to handle multiple images
     topSelling: { type: Boolean, default: false },
   },
   { timestamps: true }
