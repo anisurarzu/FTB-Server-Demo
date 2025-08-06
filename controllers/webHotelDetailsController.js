@@ -155,10 +155,33 @@ const processCategories = (categories = []) => {
   }));
 };
 
+// @desc Get categories by hotel ID
+// @route GET /api/web-hotel-details/:id/categories
+const getCategoriesByHotelId = async (req, res) => {
+  try {
+    const webHotelDetails = await WebHotelDetails.findOne({
+      hotelId: req.params.id,
+    });
+
+    if (!webHotelDetails) {
+      return res.status(404).json({ error: "Web hotel details not found" });
+    }
+
+    // Return only the categories array
+    res.status(200).json(webHotelDetails.categories || []);
+  } catch (error) {
+    res.status(500).json({
+      error: "Failed to fetch hotel categories",
+      details: error.message,
+    });
+  }
+};
+
 module.exports = {
   getAllWebHotelDetails,
   getWebHotelDetailsById,
   createWebHotelDetails,
   updateWebHotelDetails,
   deleteWebHotelDetails,
+  getCategoriesByHotelId,
 };

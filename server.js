@@ -11,6 +11,8 @@ const dailySummaryRoutes = require("./routes/dailySummary"); // Import booking r
 const expenseRoutes = require("./routes/expenses");
 const webHotelRoutes = require("./routes/webHotelRoutes");
 const webHotelDetailsRoutes = require("./routes/webHotelDetailsRoutes");
+const paymentRoutes = require("./routes/paymentRoutes");
+const roomNumbersRoutes = require("./routes/roomNumbers"); // Import the new room numbers routes
 require("dotenv").config();
 
 const app = express();
@@ -23,7 +25,6 @@ app.use(express.json());
 app.use(cors());
 
 // Auth Routes
-
 app.use("/api/auth", authRoutes);
 
 // Slider Routes
@@ -46,6 +47,12 @@ app.use("/api/expenses", expenseRoutes);
 
 app.use("/api/web-hotels", webHotelRoutes);
 app.use("/api/web-hotel-details", webHotelDetailsRoutes);
+
+// Payment Routes
+app.use("/api/payment", paymentRoutes);
+
+// Room Numbers Routes - Add the new routes
+app.use("/api/room-numbers", roomNumbersRoutes);
 
 // Root Route
 app.get("/", (req, res) => {

@@ -5,6 +5,7 @@ const webHotelDetailsController = require("../controllers/webHotelDetailsControl
 // WebHotelDetails routes
 router.get("/", webHotelDetailsController.getAllWebHotelDetails);
 router.get("/:id", webHotelDetailsController.getWebHotelDetailsById);
+router.get("/:id", webHotelDetailsController.getCategoriesByHotelId);
 router.post("/", webHotelDetailsController.createWebHotelDetails);
 router.put("/:id", webHotelDetailsController.updateWebHotelDetails);
 router.delete("/:id", webHotelDetailsController.deleteWebHotelDetails);

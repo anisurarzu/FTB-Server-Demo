@@ -38,7 +38,7 @@ const BookingSchema = new mongoose.Schema(
     },
     roomCategoryID: {
       type: String,
-      required: [true, "Room category ID is required"],
+      // required: [true, "Room category ID is required"],
     },
     roomCategoryName: {
       type: String,
@@ -47,11 +47,11 @@ const BookingSchema = new mongoose.Schema(
     },
     roomNumberID: {
       type: String,
-      required: [true, "Room number ID is required"],
+      // required: [true, "Room number ID is required"],
     },
     roomNumberName: {
       type: String,
-      required: [true, "Room number name is required"],
+      // required: [true, "Room number name is required"],
       trim: true,
     },
     roomPrice: {
@@ -119,6 +119,10 @@ const BookingSchema = new mongoose.Schema(
       trim: true,
     },
     note: {
+      type: String,
+      trim: true,
+    },
+    paymentScreenshot: {
       type: String,
       trim: true,
     },

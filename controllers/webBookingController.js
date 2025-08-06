@@ -282,7 +282,7 @@ const getBookingsByUserId = async (req, res) => {
         .json({ error: "No bookings found for this user ID" });
     }
 
-    // Enrich bookings with hotel image (from WebHotel model)
+    // Enrich bookings with the first hotel image (from WebHotel model)
     const enrichedBookings = await Promise.all(
       bookings.map(async (booking) => {
         const hotel = await WebHotel.findOne(
@@ -292,7 +292,7 @@ const getBookingsByUserId = async (req, res) => {
 
         return {
           ...booking.toObject(),
-          hotelImage: hotel ? hotel.image : null,
+          hotelImage: hotel?.image?.[0] || null, // Return only the first image
         };
       })
     );
